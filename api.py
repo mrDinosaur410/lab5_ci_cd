@@ -300,7 +300,7 @@ async def data_2mb_route(current_user: User = Depends(require_scope(TokenScope.d
 
 @router.get("/data_10mb")
 async def data_10mb_route(current_user: User = Depends(require_scope(TokenScope.data_10mb))):
-    return {"message": f"Welcome, {current_user.username}. You have access to 10MB data scope!."}
+    return {"message": f"Welcome, {current_user.username}. You have access to 10MB data scope."}
 
 
 @router.get("/data_unlimited")
@@ -309,4 +309,4 @@ async def data_unlimited_route(current_user: User = Depends(require_scope(TokenS
 
 @router.get("/health")
 async def health_check():
-    return {"status": "Hello World"}
+    return {"status": "Hello World OK"}

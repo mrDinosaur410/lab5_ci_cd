@@ -306,3 +306,7 @@ async def data_10mb_route(current_user: User = Depends(require_scope(TokenScope.
 @router.get("/data_unlimited")
 async def data_unlimited_route(current_user: User = Depends(require_scope(TokenScope.data_unlimited))):
     return {"message": f"Welcome, {current_user.username}. You have unlimited data access."}
+
+@router.get("/health")
+async def health_check():
+    return {"status": "Hello World"}

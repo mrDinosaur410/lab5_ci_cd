@@ -49,6 +49,11 @@ jobs:
             -v $(pwd)/staging_auth.db:/app/staging_auth.db \
             -p 8000:8000 \
             auth-api:latest
+      - name: Build on test
+        if: success()
+        run: |
+          curl -X POST ${{ secrets.RENDER_HOOK_DEV }}
+      
 
   integration-test:
     name: 🧪 Integration Test

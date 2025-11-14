@@ -309,4 +309,4 @@ async def data_unlimited_route(current_user: User = Depends(require_scope(TokenS
 
 @router.get("/health")
 async def health_check():
-    return {"status": "Hello World"}
+    return {"status": "Hello World asdfgh"}

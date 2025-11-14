@@ -23,7 +23,7 @@ async def test_user_registration_flow():
             json={"username": "testuser@example.com", "password": "testpassword123", "role": "user"},
         )
         data = response.json()
-        assert response.status_code == 200
+        assert response.status_code == 300
         assert data["access_token"]
         assert data["refresh_token"]
         assert data["expires_in"]

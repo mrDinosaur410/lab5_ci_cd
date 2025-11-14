@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pyjwt
+bcrypt 
+sqlalchemy
+python-dotenv
+pytest
+httpx
+aiosqlite
+pytest-asyncio

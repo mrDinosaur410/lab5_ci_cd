@@ -1,0 +1,96 @@
+name: Full CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  unit-test:
+    name: 🧪 Unit Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧪 Run unit tests
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./test_auth.db
+        run: pytest tests/test_unit.py
+
+  staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: unit-test
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🐳 Build and run app
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./staging_auth.db
+        run: |
+          docker build -t auth-api:latest .
+          docker run -d \
+            --name staging-app \
+            -e DATABASE_URL=sqlite+aiosqlite:///./staging_auth.db \
+            -v $(pwd)/staging_auth.db:/app/staging_auth.db \
+            -p 8000:8000 \
+            auth-api:latest
+
+  integration-test:
+    name: 🧪 Integration Test
+    runs-on: ubuntu-latest
+    needs: staging
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🐳 Build test container
+        run: docker build -t auth-api-test:latest .
+
+      - name: 🧪 Run integration tests in Docker
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./integration_test_auth.db
+        run: |
+          docker run --rm \
+          -e DATABASE_URL=sqlite+aiosqlite:///./integration_test_auth.db \
+          --entrypoint "" \
+          auth-api-test pytest tests/test_integration.py -v
+
+  production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: integration-test
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🐳 Build and run production app
+        env:
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+        run: |
+          docker build -t auth-api-prod:latest .
+          docker run -d \
+            --name prod-app \
+            -e DATABASE_URL=sqlite+aiosqlite:///./prod_auth.db \
+            -e JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }} \
+            -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} \
+            -v $(pwd)/prod_auth.db:/app/prod_auth.db \
+            -p 8000:8000 \
+            auth-api-prod:latest

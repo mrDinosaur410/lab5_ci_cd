@@ -16,10 +16,10 @@ class RefreshTokenModel(BaseModel):
 
 
 class TokenScope(str, Enum):
-    read_user = "user:read"
-    write_user = "user:write"
-    read_admin = "admin:read"
-    write_admin = "admin:write"
+    data_0mb = "data:0mb"
+    data_2mb = "data:2mb" 
+    data_10mb = "data:10mb"
+    data_unlimited = "data:unlimited"
 
 
 class TokenType(str, Enum):

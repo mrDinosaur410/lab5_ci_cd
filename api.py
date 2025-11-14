@@ -16,9 +16,8 @@ load_dotenv()
 
 JWT_ACCESS_SECRET = os.getenv("JWT_ACCESS_SECRET", "default_access_secret")
 JWT_REFRESH_SECRET = os.getenv("JWT_REFRESH_SECRET", "default_refresh_secret")
-JWT_ACCESS_EXPIRES = int(os.getenv("JWT_ACCESS_EXPIRES_S", "900"))
-JWT_REFRESH_EXPIRES = int(os.getenv("JWT_REFRESH_EXPIRES_S", "2592000"))
-SALT = os.getenv("SALT", "default_salt")
+JWT_ACCESS_EXPIRES = int(os.getenv("JWT_ACCESS_EXPIRES", "900"))
+JWT_REFRESH_EXPIRES = int(os.getenv("JWT_REFRESH_EXPIRES", "2592000"))
 
 
 api_router = APIRouter()
@@ -79,11 +78,35 @@ def get_scopes_for_role(role: Role):
     match role:
         case Role.admin:
             return [
-                TokenScope.read_admin,
-                TokenScope.write_admin,
+                TokenScope.data_0mb,
+                TokenScope.data_2mb,
+                TokenScope.data_10mb,
+                TokenScope.data_unlimited,
             ]
         case Role.user:
-            return [TokenScope.read_user, TokenScope.write_user]
+            return [
+                #TokenScope.data_0mb,
+                TokenScope.data_2mb,
+                #TokenScope.data_10mb,
+            ]
+
+
+def get_max_data_size(scopes: List[TokenScope]) -> int:
+    max_size = 0
+    
+    if TokenScope.data_unlimited in scopes:
+        return -1
+    
+    if TokenScope.data_10mb in scopes:
+        max_size = max(max_size, 10 * 1024 * 1024)
+    
+    if TokenScope.data_2mb in scopes:
+        max_size = max(max_size, 2 * 1024 * 1024)
+    
+    if TokenScope.data_0mb in scopes:
+        max_size = max(max_size, 0)
+    
+    return max_size
 
 
 async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)):
@@ -113,14 +136,23 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
     return {"user": db_user, "scope": payload.get("scope")}
 
 
-def require_all_scopes(required_scopes: List[TokenScope]):
+def require_scope(required_scope: TokenScope):
     async def scope_checker(context: dict = Depends(get_current_user)):
         token_scopes = context.get("scope", [])
-        if not all(scope in token_scopes for scope in required_scopes):
-            raise HTTPException(status_code=403, detail="Missing required scopes")
+        if required_scope not in token_scopes:
+            raise HTTPException(status_code=403, detail=f"Missing required scope: {required_scope}")
         return context["user"]
 
     return scope_checker
+
+
+def validate_data_size(data_size: int, scopes: List[TokenScope]) -> bool:
+    max_allowed = get_max_data_size(scopes)
+    
+    if max_allowed == -1:
+        return True
+    
+    return data_size <= max_allowed
 
 
 @router.post("/login", response_model=TokenModel)
@@ -218,30 +250,59 @@ async def refresh_token(
         expires_in=JWT_ACCESS_EXPIRES,
     )
 
-
-@router.get("/full_admin")
-async def full_admin_route(
-    current_user: User = Depends(
-        require_all_scopes([TokenScope.read_admin, TokenScope.write_admin])
-    ),
+@router.post("/upload")
+async def upload_data(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
 ):
-    return {"message": f"Welcome, {current_user.username}. You have full-admin access."}
+    content_length = request.headers.get("content-length")
+    if not content_length:
+        raise HTTPException(status_code=411, detail="Content-Length header required")
+    
+    data_size = int(content_length)
+    scopes = current_user.get("scope", [])
+    
+    if not validate_data_size(data_size, scopes):
+        max_allowed = get_max_data_size(scopes)
+        raise HTTPException(
+            status_code=413, 
+            detail=f"Data size ({data_size} bytes) exceeds allowed limit ({max_allowed} bytes)"
+        )
+    
+    return {
+        "message": f"Successfully uploaded {data_size} bytes",
+        "max_allowed": get_max_data_size(scopes)
+    }
 
 
-@router.get("/read_admin")
-async def read_admin_route(
-    current_user: User = Depends(require_all_scopes([TokenScope.write_admin])),
-):
-    return {"message": f"Welcome, {current_user.username}. You have semi-admin access."}
+@router.get("/my_limits")
+async def get_my_limits(current_user: dict = Depends(get_current_user)):
+    scopes = current_user.get("scope", [])
+    max_size = get_max_data_size(scopes)
+    
+    return {
+        "username": current_user["user"].username,
+        "scopes": scopes,
+        "max_data_size_bytes": max_size,
+        "max_data_size_human": "unlimited" if max_size == -1 else f"{max_size / (1024*1024):.1f} MB"
+    }
 
 
-@router.get("/read_user")
-async def read_user_route(
-    current_user: User = Depends(require_all_scopes([TokenScope.read_user])),
-):
-    return {"message": f"Welcome, {current_user.username}. You have user access."}
+@router.get("/data_0mb")
+async def data_0mb_route(current_user: User = Depends(require_scope(TokenScope.data_0mb))):
+    return {"message": f"Welcome, {current_user.username}. You have access to 0MB data scope."}
 
 
-@router.get("/health")
-async def health_check():
-    return {"status": "Hello World"}
+@router.get("/data_2mb") 
+async def data_2mb_route(current_user: User = Depends(require_scope(TokenScope.data_2mb))):
+    return {"message": f"Welcome, {current_user.username}. You have access to 2MB data scope."}
+
+
+@router.get("/data_10mb")
+async def data_10mb_route(current_user: User = Depends(require_scope(TokenScope.data_10mb))):
+    return {"message": f"Welcome, {current_user.username}. You have access to 10MB data scope."}
+
+
+@router.get("/data_unlimited")
+async def data_unlimited_route(current_user: User = Depends(require_scope(TokenScope.data_unlimited))):
+    return {"message": f"Welcome, {current_user.username}. You have unlimited data access."}

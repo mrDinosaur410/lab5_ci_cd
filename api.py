@@ -16,7 +16,7 @@ load_dotenv()
 
 JWT_ACCESS_SECRET = os.getenv("JWT_ACCESS_SECRET", "default_access_secret")
 JWT_REFRESH_SECRET = os.getenv("JWT_REFRESH_SECRET", "default_refresh_secret")
-JWT_ACCESS_EXPIRES = int(os.getenv("JWT_ACCESS_EXPIRES", "900"))
+JWT_ACCESS_EXPIRES = int(os.getenv("JWT_ACCESS_EXPIRES", "90"))
 JWT_REFRESH_EXPIRES = int(os.getenv("JWT_REFRESH_EXPIRES", "2592000"))
 
 
